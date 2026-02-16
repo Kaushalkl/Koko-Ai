@@ -1,0 +1,201 @@
+/**
+ * =====================================================
+ * KOKO AI v6.4 – AUTO LANGUAGE TEXT + VOICE (FINAL)
+ * =====================================================
+ */
+
+let synth = window.speechSynthesis;
+let recognition = null;
+let isMicActive = false;
+let hasBooted = false;
+
+let lastUserLang = "en-US";   // en-US | hi-IN | hinglish
+let lastEmotion = "neutral";
+
+const statusText = document.getElementById("status");
+const msgText = document.getElementById("msg");
+const waveBox = document.getElementById("waveBox");
+
+/* ---------------- WAVE ---------------- */
+function toggleWave(active) {
+    waveBox?.classList.toggle("active", active);
+}
+
+/* ---------------- LANGUAGE DETECTION ---------------- */
+function detectLanguage(text) {
+    const hasHindi = /[\u0900-\u097F]/.test(text);
+    const hasEnglish = /[a-zA-Z]/.test(text);
+
+    if (hasHindi && hasEnglish) return "hinglish";
+    if (hasHindi) return "hi-IN";
+    return "en-US";
+}
+
+/* ---------------- EMOTION ---------------- */
+function detectEmotion(text) {
+    text = text.toLowerCase();
+    if (/gussa|angry|idiot|stupid/.test(text)) return "angry";
+    if (/sad|dukhi|depressed/.test(text)) return "sad";
+    if (/happy|khush|awesome|great/.test(text)) return "happy";
+    if (/love|jaan|miss you/.test(text)) return "loving";
+    return "neutral";
+}
+
+/* ---------------- FEMALE SIRI-LIKE VOICE ---------------- */
+function pickSiriLikeFemaleVoice(lang) {
+    const voices = synth.getVoices();
+
+    // Apple Siri (if available)
+    const siri = voices.find(v => /siri/i.test(v.name) && v.lang.startsWith(lang.split("-")[0]));
+    if (siri) return siri;
+
+    // Hindi Female
+    if (lang === "hi-IN") {
+        return (
+            voices.find(v => /kalpana/i.test(v.name)) ||
+            voices.find(v => v.lang === "hi-IN") ||
+            voices.find(v => /female/i.test(v.name))
+        );
+    }
+
+    // English Female (Zira / Google)
+    return (
+        voices.find(v => /zira/i.test(v.name)) ||
+        voices.find(v => /female/i.test(v.name) && v.lang.startsWith("en")) ||
+        voices.find(v => v.lang === "en-US")
+    );
+}
+
+/* ---------------- EMOTION TONE ---------------- */
+function applyEmotionTone(text) {
+    if (lastEmotion === "angry")
+        return lastUserLang === "en-US"
+            ? "Please calm down. " + text
+            : "Shaant ho jaiye. " + text;
+
+    if (lastEmotion === "sad")
+        return lastUserLang === "en-US"
+            ? "I understand. " + text
+            : "Main samajh rahi hoon. " + text;
+
+    if (lastEmotion === "happy") return "😄 " + text;
+
+    return text;
+}
+
+/* ---------------- SPEAK ---------------- */
+function speak(text) {
+    if (!text) return;
+    synth.cancel();
+
+    text = applyEmotionTone(text);
+
+    const utter = new SpeechSynthesisUtterance(text);
+
+    utter.lang = lastUserLang === "hinglish" ? "hi-IN" : lastUserLang;
+    utter.voice = pickSiriLikeFemaleVoice(utter.lang);
+
+    utter.pitch = 1.05;
+    utter.rate = 0.95;
+
+    utter.onstart = () => {
+        statusText.innerText = "🎙️ KOKO RESPONDING...";
+        toggleWave(true);
+    };
+
+    utter.onend = () => {
+        statusText.innerText = "KOKO READY";
+        toggleWave(false);
+        if (isMicActive) setTimeout(startListening, 600);
+    };
+
+    synth.speak(utter);
+}
+
+/* ---------------- OFFLINE BRAIN (LANGUAGE LOCKED) ---------------- */
+function offlineBrain(cmd) {
+    if (lastUserLang === "en-US") {
+        if (/time/.test(cmd)) return new Date().toLocaleTimeString();
+        if (/date/.test(cmd)) return new Date().toDateString();
+        return "I'm offline right now, but I'm still listening.";
+    }
+
+    // Hindi / Hinglish
+    if (/samay|time/.test(cmd)) return new Date().toLocaleTimeString("hi-IN");
+    if (/date|aaj|tarikh/.test(cmd)) return new Date().toDateString("hi-IN");
+    return "Abhi main offline hoon, par sun rahi hoon.";
+}
+
+/* ---------------- SPEECH RECOGNITION ---------------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SR) {
+    recognition = new SR();
+    recognition.lang = "hi-IN"; // Hindi + English both catch
+    recognition.interimResults = false;
+
+    recognition.onresult = async (e) => {
+        const cmd = e.results[0][0].transcript;
+
+        // 🔥 AUTO LOCK USER LANGUAGE
+        lastUserLang = detectLanguage(cmd);
+        lastEmotion = detectEmotion(cmd);
+
+        // 🔥 USER TEXT SAME LANGUAGE
+        msgText.innerHTML = `<span style="color:#00ffff">You:</span> ${cmd}`;
+        statusText.innerText = "🧠 ANALYZING...";
+
+        try {
+            const res = await fetch("/process_command", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    command: cmd,
+                    language: lastUserLang
+                })
+            });
+
+            if (!res.ok) throw "offline";
+
+            const data = await res.json();
+
+            // 🔥 KOKO TEXT SAME LANGUAGE
+            msgText.innerHTML += `<br><span style="color:#ff4fd8">KOKO:</span> ${data.reply}`;
+            speak(data.reply);
+
+        } catch {
+            const reply = offlineBrain(cmd);
+            msgText.innerHTML += `<br><span style="color:#ffaa00">KOKO:</span> ${reply}`;
+            speak(reply);
+        }
+    };
+}
+
+/* ---------------- BOOT ---------------- */
+function bootKoko() {
+    if (hasBooted) return;
+    hasBooted = true;
+
+    statusText.innerText = "CORE SYNCED";
+
+    setTimeout(() => {
+        speak(
+            "KOKO online. I will reply in the same language you speak."
+        );
+    }, 800);
+}
+
+function startListening() {
+    if (!recognition || synth.speaking) return;
+    recognition.start();
+    statusText.innerText = "🎧 LISTENING...";
+    toggleWave(true);
+}
+
+function startKoko() {
+    isMicActive = true;
+    if (!hasBooted) bootKoko();
+    else startListening();
+}
+
+window.addEventListener("click", bootKoko, { once: true });

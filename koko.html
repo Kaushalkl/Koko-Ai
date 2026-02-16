@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOKO PRO | AI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: radial-gradient(circle at center, #0a0a12 0%, #000000 100%);
+            color: #e0e0e0;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px #00d4ff, 0 0 20px #00d4ff;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Voice Wave Animation */
+        .wave-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            height: 50px;
+        }
+
+        .bar {
+            width: 4px;
+            height: 10px;
+            background: #00d4ff;
+            border-radius: 10px;
+            animation: quiet 1.2s ease-in-out infinite;
+        }
+
+        .active .bar {
+            animation: pulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { height: 10px; }
+            50% { height: 40px; }
+        }
+
+        @keyframes quiet {
+            0%, 100% { height: 5px; }
+            50% { height: 15px; }
+        }
+
+        .bar:nth-child(2) { animation-delay: 0.1s; }
+        .bar:nth-child(3) { animation-delay: 0.2s; }
+        .bar:nth-child(4) { animation-delay: 0.3s; }
+        .bar:nth-child(5) { animation-delay: 0.4s; }
+
+        #chat-box::-webkit-scrollbar { width: 5px; }
+        #chat-box::-webkit-scrollbar-thumb { background: #00d4ff; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex items-center justify-center">
+
+    <div class="w-full max-w-4xl h-[90vh] glass p-8 flex flex-col relative overflow-hidden">
+        
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold glow-text tracking-widest">KOKO PRO</h1>
+                <p class="text-cyan-400 text-sm italic">Quantum Intelligence System</p>
+            </div>
+            <div id="status-dot" class="w-4 h-4 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]"></div>
+        </div>
+
+        <div id="wave" class="wave-container mb-6">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+
+        <div id="chat-box" class="flex-grow overflow-y-auto mb-6 p-4 space-y-4">
+            <div class="text-cyan-300">Koko: System online. How can I assist you today?</div>
+        </div>
+
+        <div class="flex gap-4">
+            <input type="text" id="user-input" 
+                class="flex-grow bg-black/40 border border-cyan-900 rounded-lg p-3 outline-none focus:border-cyan-400 text-white transition-all"
+                placeholder="Type your command or say something...">
+            <button onclick="sendCommand()" 
+                class="bg-cyan-600 hover:bg-cyan-400 text-black px-6 py-3 rounded-lg font-bold transition-all transform hover:scale-105">
+                EXECUTE
+            </button>
+        </div>
+
+        <div class="absolute bottom-2 right-8 text-[10px] text-cyan-900 uppercase tracking-tighter">
+            Hardware Acceleration: Enabled | Core: Llama-3.3-70B
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const wave = document.getElementById('wave');
+
+        async function sendCommand() {
+            const cmd = userInput.value;
+            if (!cmd) return;
+
+            // Add User Message
+            appendMessage("User", cmd, "text-gray-400");
+            userInput.value = "";
+            
+            // Start Animation
+            wave.classList.add('active');
+
+            try {
+                const response = await fetch('/process_command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                });
+                const data = await response.json();
+                
+                // Stop Animation and Add Koko's Reply
+                wave.classList.remove('active');
+                appendMessage("Koko", data.reply, "text-cyan-300 font-bold");
+
+                // Text-to-Speech (Optional browser feature)
+                speak(data.reply);
+
+            } catch (error) {
+                appendMessage("System", "Error connecting to KOKO.", "text-red-500");
+                wave.classList.remove('active');
+            }
+        }
+
+        function appendMessage(sender, text, colorClass) {
+            const msg = document.createElement('div');
+            msg.innerHTML = `<span class="${colorClass}">${sender}:</span> ${text}`;
+            chatBox.appendChild(msg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'hi-IN'; // Hinglish support
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Allow Enter Key
+        userInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendCommand();
+        });
+    </script>
+</body>
+</html>

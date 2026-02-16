@@ -1,0 +1,11 @@
+flask
+psutil
+pyttsx3
+pyautogui
+pywhatkit
+vosk
+pyaudio
+python-dotenv
+opencv-python
+opencv-contrib-python
+numpy

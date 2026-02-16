@@ -23,9 +23,9 @@ logger = logging.getLogger("KOKO_PRO")
 app = Flask(__name__, template_folder='.', static_folder='.', static_url_path='')
 
 # ================= CONFIG =================
-LIVEKIT_API_KEY = "APIweMe2bNPEbzn"
-LIVEKIT_API_SECRET = "kfhZehmCOKz9kIaDfa2zSVz64qLqHz8DPZEYTq6enYEB"
-GROQ_API_KEY = "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"
+LIVEKIT_API_KEY = ""
+LIVEKIT_API_SECRET = ""
+GROQ_API_KEY = ""
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
@@ -233,3 +233,4 @@ if __name__ == "__main__":
     print("\n💠 KOKO PRO ONLINE | ADVANCED MODE READY")
     print("🌐 http://localhost:5000\n")
     app.run(host="0.0.0.0", port=5000, debug=True)
+
